@@ -70,6 +70,12 @@ def show_task_form(parent, on_save=None):
             return
         task = Task(title=title, description=desc, deadline=deadline)
         db.add_task(task)
+        # 즉시 스케줄러 체크 트리거
+        try:
+            import core.scheduler as scheduler
+            scheduler.check_now()
+        except Exception:
+            pass
         top.grab_release()
         top.destroy()
         if on_save:

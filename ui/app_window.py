@@ -1,9 +1,11 @@
 import customtkinter as ctk
 import core.database as db
 import core.scheduler as scheduler
+from features.countdown import seconds_left
 from ui.task_form import show_task_form
 from ui.task_list import TaskListFrame
 from ui.alert_popup import show_alert
+from ui.verify_popup import show_verify
 
 
 class AppWindow(ctk.CTk):
@@ -20,12 +22,11 @@ class AppWindow(ctk.CTk):
         self._full_refresh()
         self._tick()
         self._poll_alerts()
+        self._poll_verify()
 
-        # Ctrl+N 단축키로 할 일 추가
         self.bind("<Control-n>", lambda e: self._open_form())
 
     def _build_ui(self):
-        # 헤더
         header = ctk.CTkFrame(self, height=60, fg_color="#12122a")
         header.pack(fill="x")
         header.pack_propagate(False)
@@ -40,7 +41,6 @@ class AppWindow(ctk.CTk):
             command=self._open_form,
         ).pack(side="right", padx=20, pady=10)
 
-        # 탭
         self.tab = ctk.CTkTabview(self)
         self.tab.pack(fill="both", expand=True, padx=16, pady=(8, 16))
         self.tab.add("진행 중")
@@ -62,7 +62,6 @@ class AppWindow(ctk.CTk):
         self.done_list.pack(fill="both", expand=True)
 
     def _full_refresh(self):
-        """DB에서 읽어 카드 전체 재구성 — 추가/삭제/완수 시에만 호출."""
         all_tasks = db.get_all_tasks()
         active = [t for t in all_tasks if t.status == "active"]
         done = [t for t in all_tasks if t.status == "completed"]
@@ -70,7 +69,6 @@ class AppWindow(ctk.CTk):
         self.active_list.refresh(active)
         self.done_list.refresh(done)
 
-        # 탭에 개수 표시 (현재 탭 위치 유지)
         try:
             self.tab._segmented_button.configure(
                 values=[
@@ -81,8 +79,7 @@ class AppWindow(ctk.CTk):
         except Exception:
             pass
 
-        # 긴급 태스크 수를 윈도우 타이틀에 표시
-        overdue = sum(1 for t in active if __import__('features.countdown', fromlist=['seconds_left']).seconds_left(t) <= 0)
+        overdue = sum(1 for t in active if seconds_left(t) <= 0)
         if overdue:
             self.title(f"⚠ NEVER FORGET — 마감 초과 {overdue}개!")
         elif active:
@@ -91,8 +88,12 @@ class AppWindow(ctk.CTk):
             self.title("NEVER FORGET")
 
     def _tick(self):
-        """매초 카운트다운 라벨만 갱신 (DB 쿼리 없음)."""
         self.active_list.tick()
+        # 마감 초과 발생 시 타이틀도 갱신
+        all_tasks = db.get_active_tasks()
+        overdue = sum(1 for t in all_tasks if seconds_left(t) <= 0)
+        if overdue:
+            self.title(f"⚠ NEVER FORGET — 마감 초과 {overdue}개!")
         self.after(1000, self._tick)
 
     def _open_form(self):
@@ -107,7 +108,7 @@ class AppWindow(ctk.CTk):
         self._full_refresh()
 
     def _poll_alerts(self):
-        """스케줄러 큐를 폴링해서 알림 팝업 표시."""
+        """알림 큐 폴링 — level 0은 OS 토스트, level 1/2는 팝업."""
         try:
             while True:
                 alert = scheduler.alert_queue.get_nowait()
@@ -115,11 +116,34 @@ class AppWindow(ctk.CTk):
                 level = alert["level"]
                 message = alert["message"]
 
-                def _on_close(completed=False, t=task):
-                    if completed:
-                        self._complete_task(t)
-
-                show_alert(self, task, message, level, on_close=_on_close)
+                if level == 0:
+                    # OS 시스템 토스트 (방해 최소화)
+                    try:
+                        from plyer import notification
+                        notification.notify(
+                            title="NEVER FORGET",
+                            message=f"{task.title}\n{message}",
+                            app_name="Never Forget",
+                            timeout=5,
+                        )
+                    except Exception:
+                        pass
+                else:
+                    def _on_close(completed=False, t=task):
+                        if completed:
+                            self._complete_task(t)
+                    show_alert(self, task, message, level, on_close=_on_close)
         except Exception:
             pass
         self.after(2000, self._poll_alerts)
+
+    def _poll_verify(self):
+        """기억 검증 큐 폴링."""
+        try:
+            item = scheduler.verify_queue.get_nowait()
+            task = item["task"]
+            # 아직 다른 팝업이 없을 때만 검증 팝업 표시
+            show_verify(self, task)
+        except Exception:
+            pass
+        self.after(5000, self._poll_verify)
