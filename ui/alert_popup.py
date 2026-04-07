@@ -1,6 +1,7 @@
 import winsound
 import customtkinter as ctk
 from core.models import Task
+from features.countdown import format_countdown, urgency_color
 import core.database as db
 
 
@@ -50,13 +51,34 @@ def show_alert(parent, task: Task, message: str, level: int, on_close=None):
         wraplength=600,
     ).pack(pady=5)
 
+    # 남은 시간 (실시간 갱신)
+    countdown_label = ctk.CTkLabel(
+        frame,
+        text=format_countdown(task),
+        font=("Pretendard", 16, "bold"),
+        text_color=urgency_color(task),
+    )
+    countdown_label.pack(pady=3)
+
+    def _update_countdown():
+        try:
+            countdown_label.configure(
+                text=format_countdown(task),
+                text_color=urgency_color(task),
+            )
+            top.after(1000, _update_countdown)
+        except Exception:
+            pass
+
+    top.after(1000, _update_countdown)
+
     # 마감
     ctk.CTkLabel(
         frame,
         text=f"마감: {task.deadline.strftime('%Y-%m-%d %H:%M')}",
-        font=("Pretendard", 14),
+        font=("Pretendard", 13),
         text_color="#AAAAAA",
-    ).pack(pady=5)
+    ).pack(pady=2)
 
     def _acknowledge():
         db.escalate_threat(task.id)     # 무시할수록 위협 단계 상승

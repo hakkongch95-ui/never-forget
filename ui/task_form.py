@@ -7,7 +7,7 @@ from core.models import Task
 def show_task_form(parent, on_save=None):
     top = ctk.CTkToplevel(parent)
     top.title("할 일 추가")
-    top.geometry("460x380")
+    top.geometry("460x400")
     top.resizable(False, False)
     top.attributes("-topmost", True)
     top.grab_set()
@@ -31,7 +31,7 @@ def show_task_form(parent, on_save=None):
     error_label = ctk.CTkLabel(top, text="", text_color="#FF3333", font=("Pretendard", 12))
     error_label.pack()
 
-    def _save():
+    def _save(event=None):
         title = title_entry.get().strip()
         desc = desc_entry.get().strip()
         dl_str = deadline_entry.get().strip()
@@ -50,4 +50,10 @@ def show_task_form(parent, on_save=None):
         if on_save:
             on_save()
 
+    # Enter 키로 저장
+    top.bind("<Return>", _save)
+
     ctk.CTkButton(top, text="저장", width=160, height=42, command=_save).pack(pady=15)
+
+    # 폼 열리면 제목 필드에 자동 포커스
+    top.after(100, title_entry.focus_set)

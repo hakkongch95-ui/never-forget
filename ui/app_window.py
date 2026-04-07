@@ -4,7 +4,6 @@ import core.scheduler as scheduler
 from ui.task_form import show_task_form
 from ui.task_list import TaskListFrame
 from ui.alert_popup import show_alert
-from ui.verify_popup import show_verify
 
 
 class AppWindow(ctk.CTk):
@@ -18,8 +17,12 @@ class AppWindow(ctk.CTk):
         self.minsize(600, 480)
 
         self._build_ui()
-        self._refresh()
+        self._full_refresh()
+        self._tick()
         self._poll_alerts()
+
+        # Ctrl+N 단축키로 할 일 추가
+        self.bind("<Control-n>", lambda e: self._open_form())
 
     def _build_ui(self):
         # 헤더
@@ -33,7 +36,7 @@ class AppWindow(ctk.CTk):
         ).pack(side="left", padx=20, pady=10)
 
         ctk.CTkButton(
-            header, text="+ 할 일 추가", width=130, height=36,
+            header, text="+ 할 일 추가  (Ctrl+N)", width=180, height=36,
             command=self._open_form,
         ).pack(side="right", padx=20, pady=10)
 
@@ -53,29 +56,50 @@ class AppWindow(ctk.CTk):
 
         self.done_list = TaskListFrame(
             self.tab.tab("완료"),
+            on_delete=self._delete_task,
             fg_color="transparent",
         )
         self.done_list.pack(fill="both", expand=True)
 
-    def _refresh(self):
+    def _full_refresh(self):
+        """DB에서 읽어 카드 전체 재구성 — 추가/삭제/완수 시에만 호출."""
         all_tasks = db.get_all_tasks()
         active = [t for t in all_tasks if t.status == "active"]
         done = [t for t in all_tasks if t.status == "completed"]
+
         self.active_list.refresh(active)
         self.done_list.refresh(done)
-        # 1초마다 카운트다운 갱신
-        self.after(1000, self._refresh)
+
+        # 탭에 개수 표시
+        self.tab.set("진행 중")
+        for name, count in [("진행 중", len(active)), ("완료", len(done))]:
+            label = f"{name} ({count})" if count else name
+            # CTkTabview는 탭 이름 변경을 지원하지 않으므로 탭 버튼 텍스트를 직접 조작
+            try:
+                self.tab._segmented_button.configure(
+                    values=[
+                        f"진행 중 ({len(active)})" if len(active) else "진행 중",
+                        f"완료 ({len(done)})" if len(done) else "완료",
+                    ]
+                )
+            except Exception:
+                pass
+
+    def _tick(self):
+        """매초 카운트다운 라벨만 갱신 (DB 쿼리 없음)."""
+        self.active_list.tick()
+        self.after(1000, self._tick)
 
     def _open_form(self):
-        show_task_form(self, on_save=self._refresh)
+        show_task_form(self, on_save=self._full_refresh)
 
     def _complete_task(self, task):
         db.mark_completed(task.id)
-        self._refresh()
+        self._full_refresh()
 
     def _delete_task(self, task):
         db.delete_task(task.id)
-        self._refresh()
+        self._full_refresh()
 
     def _poll_alerts(self):
         """스케줄러 큐를 폴링해서 알림 팝업 표시."""

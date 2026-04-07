@@ -1,7 +1,19 @@
 import customtkinter as ctk
 from core.models import Task
 from features.countdown import format_countdown, urgency_color
-import core.database as db
+
+
+def _card_bg(task: Task) -> str:
+    """긴급도에 따라 카드 배경색 결정."""
+    from features.countdown import seconds_left
+    secs = seconds_left(task)
+    if secs <= 0:
+        return "#3a0000"   # 초과 — 어두운 빨강
+    if secs <= 900:
+        return "#2d1500"   # 15분 — 어두운 주황
+    if secs <= 3600:
+        return "#2a2000"   # 1시간 — 어두운 노랑
+    return "#1e1e35"       # 여유 — 기본
 
 
 class TaskListFrame(ctk.CTkScrollableFrame):
@@ -9,12 +21,14 @@ class TaskListFrame(ctk.CTkScrollableFrame):
         super().__init__(master, **kwargs)
         self.on_complete = on_complete
         self.on_delete = on_delete
-        self._cards: list[ctk.CTkFrame] = []
+        self._cards: list = []
+        self._countdown_labels: list[tuple[ctk.CTkLabel, Task]] = []
 
     def refresh(self, tasks: list[Task]):
         for card in self._cards:
             card.destroy()
         self._cards.clear()
+        self._countdown_labels.clear()
 
         if not tasks:
             label = ctk.CTkLabel(
@@ -28,25 +42,44 @@ class TaskListFrame(ctk.CTkScrollableFrame):
         for task in tasks:
             self._add_card(task)
 
+    def tick(self):
+        """매초 카운트다운 라벨만 갱신 (카드 재생성 없음)."""
+        for label, task in self._countdown_labels:
+            try:
+                label.configure(
+                    text=format_countdown(task),
+                    text_color=urgency_color(task),
+                )
+            except Exception:
+                pass
+
     def _add_card(self, task: Task):
         color = urgency_color(task)
-        card = ctk.CTkFrame(self, fg_color="#2a2a3e", corner_radius=10)
+        bg = _card_bg(task)
+        card = ctk.CTkFrame(self, fg_color=bg, corner_radius=10)
         card.pack(fill="x", padx=10, pady=6)
         self._cards.append(card)
 
+        # 긴급도 표시 바 (좌측 세로 선)
+        accent = urgency_color(task)
+        bar = ctk.CTkFrame(card, width=4, fg_color=accent, corner_radius=2)
+        bar.pack(side="left", fill="y", padx=(6, 0), pady=8)
+
         # 좌측: 제목 + 카운트다운
         left = ctk.CTkFrame(card, fg_color="transparent")
-        left.pack(side="left", fill="both", expand=True, padx=14, pady=10)
+        left.pack(side="left", fill="both", expand=True, padx=10, pady=10)
 
         ctk.CTkLabel(
             left, text=task.title,
             font=("Pretendard", 15, "bold"), text_color="#FFFFFF", anchor="w"
         ).pack(anchor="w")
 
-        ctk.CTkLabel(
+        countdown_label = ctk.CTkLabel(
             left, text=format_countdown(task),
             font=("Pretendard", 13), text_color=color, anchor="w"
-        ).pack(anchor="w")
+        )
+        countdown_label.pack(anchor="w")
+        self._countdown_labels.append((countdown_label, task))
 
         if task.description:
             ctk.CTkLabel(
@@ -58,14 +91,43 @@ class TaskListFrame(ctk.CTkScrollableFrame):
         right = ctk.CTkFrame(card, fg_color="transparent")
         right.pack(side="right", padx=10, pady=10)
 
-        ctk.CTkButton(
-            right, text="완수", width=70, height=32,
-            fg_color="#00AA55", hover_color="#008844",
-            command=lambda t=task: self.on_complete and self.on_complete(t),
-        ).pack(pady=2)
+        if self.on_complete:
+            ctk.CTkButton(
+                right, text="완수", width=70, height=32,
+                fg_color="#00AA55", hover_color="#008844",
+                command=lambda t=task: self.on_complete(t),
+            ).pack(pady=2)
 
-        ctk.CTkButton(
-            right, text="삭제", width=70, height=32,
-            fg_color="#AA2222", hover_color="#881111",
-            command=lambda t=task: self.on_delete and self.on_delete(t),
-        ).pack(pady=2)
+        if self.on_delete:
+            ctk.CTkButton(
+                right, text="삭제", width=70, height=32,
+                fg_color="#3a3a3a", hover_color="#AA2222",
+                command=lambda t=task: self._confirm_delete(t),
+            ).pack(pady=2)
+
+    def _confirm_delete(self, task: Task):
+        """삭제 확인 다이얼로그."""
+        top = ctk.CTkToplevel(self)
+        top.title("삭제 확인")
+        top.geometry("340x160")
+        top.resizable(False, False)
+        top.attributes("-topmost", True)
+        top.grab_set()
+
+        ctk.CTkLabel(
+            top, text=f'"{task.title}" 삭제할게?',
+            font=("Pretendard", 14), wraplength=300
+        ).pack(pady=(30, 10))
+
+        btn_frame = ctk.CTkFrame(top, fg_color="transparent")
+        btn_frame.pack()
+
+        def _yes():
+            top.grab_release()
+            top.destroy()
+            self.on_delete(task)
+
+        ctk.CTkButton(btn_frame, text="삭제", width=100, fg_color="#AA2222",
+                      hover_color="#881111", command=_yes).pack(side="left", padx=10)
+        ctk.CTkButton(btn_frame, text="취소", width=100, fg_color="#444444",
+                      command=lambda: (top.grab_release(), top.destroy())).pack(side="left", padx=10)
