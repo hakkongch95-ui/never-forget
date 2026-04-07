@@ -7,9 +7,17 @@ from core.models import Task
 DB_PATH = Path(__file__).parent.parent / "data" / "never_forget.db"
 
 
+def _dt(val) -> datetime:
+    if val is None:
+        return None
+    if isinstance(val, datetime):
+        return val
+    return datetime.fromisoformat(str(val))
+
+
 def _connect():
     DB_PATH.parent.mkdir(exist_ok=True)
-    conn = sqlite3.connect(DB_PATH, detect_types=sqlite3.PARSE_DECLTYPES)
+    conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -45,16 +53,12 @@ def _row_to_task(row) -> Task:
         id=row["id"],
         title=row["title"],
         description=row["description"] or "",
-        deadline=row["deadline"] if isinstance(row["deadline"], datetime)
-                 else datetime.fromisoformat(row["deadline"]),
+        deadline=_dt(row["deadline"]),
         status=row["status"],
         threat_level=row["threat_level"],
-        created_at=row["created_at"] if isinstance(row["created_at"], datetime)
-                   else datetime.fromisoformat(row["created_at"]),
-        reminded_at=row["reminded_at"] if row["reminded_at"] is None or isinstance(row["reminded_at"], datetime)
-                    else datetime.fromisoformat(row["reminded_at"]),
-        completed_at=row["completed_at"] if row["completed_at"] is None or isinstance(row["completed_at"], datetime)
-                     else datetime.fromisoformat(row["completed_at"]),
+        created_at=_dt(row["created_at"]),
+        reminded_at=_dt(row["reminded_at"]),
+        completed_at=_dt(row["completed_at"]),
     )
 
 
