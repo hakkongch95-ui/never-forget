@@ -1,6 +1,6 @@
 import customtkinter as ctk
 from core.models import Task
-from features.countdown import format_countdown, urgency_color
+from features.countdown import format_countdown, urgency_color, seconds_left
 
 
 def _card_bg(task: Task) -> str:
@@ -17,10 +17,11 @@ def _card_bg(task: Task) -> str:
 
 
 class TaskListFrame(ctk.CTkScrollableFrame):
-    def __init__(self, master, on_complete=None, on_delete=None, **kwargs):
+    def __init__(self, master, on_complete=None, on_delete=None, on_edit=None, **kwargs):
         super().__init__(master, **kwargs)
         self.on_complete = on_complete
         self.on_delete = on_delete
+        self.on_edit = on_edit
         self._cards: list = []
         self._countdown_labels: list[tuple[ctk.CTkLabel, Task]] = []
 
@@ -72,10 +73,22 @@ class TaskListFrame(ctk.CTkScrollableFrame):
         left = ctk.CTkFrame(card, fg_color="transparent")
         left.pack(side="left", fill="both", expand=True, padx=10, pady=10)
 
+        title_row = ctk.CTkFrame(left, fg_color="transparent")
+        title_row.pack(anchor="w", fill="x")
+
         ctk.CTkLabel(
-            left, text=task.title,
+            title_row, text=task.title,
             font=("Pretendard", 15, "bold"), text_color="#FFFFFF", anchor="w"
-        ).pack(anchor="w")
+        ).pack(side="left")
+
+        # 마감 초과 배지
+        if seconds_left(task) <= 0 and task.status == "active":
+            ctk.CTkLabel(
+                title_row, text=" OVERDUE ",
+                font=("Pretendard", 10, "bold"),
+                text_color="#FFFFFF", fg_color="#CC0000",
+                corner_radius=4,
+            ).pack(side="left", padx=(8, 0))
 
         countdown_label = ctk.CTkLabel(
             left, text=format_countdown(task),
@@ -102,14 +115,21 @@ class TaskListFrame(ctk.CTkScrollableFrame):
 
         if self.on_complete:
             ctk.CTkButton(
-                right, text="완수", width=70, height=32,
+                right, text="완수", width=70, height=30,
                 fg_color="#00AA55", hover_color="#008844",
                 command=lambda t=task: self.on_complete(t),
             ).pack(pady=2)
 
+        if self.on_edit:
+            ctk.CTkButton(
+                right, text="수정", width=70, height=30,
+                fg_color="#2255AA", hover_color="#1144CC",
+                command=lambda t=task: self.on_edit(t),
+            ).pack(pady=2)
+
         if self.on_delete:
             ctk.CTkButton(
-                right, text="삭제", width=70, height=32,
+                right, text="삭제", width=70, height=30,
                 fg_color="#3a3a3a", hover_color="#AA2222",
                 command=lambda t=task: self._confirm_delete(t),
             ).pack(pady=2)

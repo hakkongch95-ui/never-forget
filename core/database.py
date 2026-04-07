@@ -109,6 +109,14 @@ def mark_completed(task_id: int):
         )
 
 
+def update_task(task_id: int, title: str, description: str, deadline):
+    with _connect() as conn:
+        conn.execute(
+            "UPDATE tasks SET title=?, description=?, deadline=? WHERE id=?",
+            (title, description, deadline.isoformat(), task_id),
+        )
+
+
 def delete_task(task_id: int):
     with _connect() as conn:
         conn.execute("DELETE FROM tasks WHERE id = ?", (task_id,))

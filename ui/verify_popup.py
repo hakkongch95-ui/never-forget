@@ -52,7 +52,9 @@ def show_verify(parent, task: Task, on_done=None):
         if on_done:
             on_done(passed)
 
+    top.bind("<Return>", lambda e: _check())
     ctk.CTkButton(
         top, text="확인", width=160, height=40,
         command=_check,
     ).pack(pady=10)
+    top.after(100, entry.focus_set)

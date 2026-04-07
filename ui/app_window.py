@@ -50,6 +50,7 @@ class AppWindow(ctk.CTk):
             self.tab.tab("진행 중"),
             on_complete=self._complete_task,
             on_delete=self._delete_task,
+            on_edit=self._edit_task,
             fg_color="transparent",
         )
         self.active_list.pack(fill="both", expand=True)
@@ -102,6 +103,9 @@ class AppWindow(ctk.CTk):
     def _complete_task(self, task):
         db.mark_completed(task.id)
         self._full_refresh()
+
+    def _edit_task(self, task):
+        show_task_form(self, on_save=self._full_refresh, edit_task=task)
 
     def _delete_task(self, task):
         db.delete_task(task.id)
