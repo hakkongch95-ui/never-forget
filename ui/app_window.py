@@ -18,6 +18,8 @@ class AppWindow(ctk.CTk):
         self.geometry("700x560")
         self.minsize(600, 480)
 
+        self._alert_open = False  # 팝업 중복 방지 플래그
+
         self._build_ui()
         self._full_refresh()
         self._tick()
@@ -58,6 +60,7 @@ class AppWindow(ctk.CTk):
         self.done_list = TaskListFrame(
             self.tab.tab("완료"),
             on_delete=self._delete_task,
+            empty_text="아직 완수한 일이 없어. 뭐 하고 있어?",
             fg_color="transparent",
         )
         self.done_list.pack(fill="both", expand=True)
@@ -89,10 +92,7 @@ class AppWindow(ctk.CTk):
             self.title("NEVER FORGET")
 
     def _tick(self):
-        self.active_list.tick()
-        # 마감 초과 발생 시 타이틀도 갱신
-        all_tasks = db.get_active_tasks()
-        overdue = sum(1 for t in all_tasks if seconds_left(t) <= 0)
+        overdue = self.active_list.tick()
         if overdue:
             self.title(f"⚠ NEVER FORGET — 마감 초과 {overdue}개!")
         self.after(1000, self._tick)
@@ -112,7 +112,7 @@ class AppWindow(ctk.CTk):
         self._full_refresh()
 
     def _poll_alerts(self):
-        """알림 큐 폴링 — level 0은 OS 토스트, level 1/2는 팝업."""
+        """알림 큐 폴링 — level 0은 OS 토스트, level 1/2는 팝업 (중복 방지)."""
         try:
             while True:
                 alert = scheduler.alert_queue.get_nowait()
@@ -121,7 +121,6 @@ class AppWindow(ctk.CTk):
                 message = alert["message"]
 
                 if level == 0:
-                    # OS 시스템 토스트 (방해 최소화)
                     try:
                         from plyer import notification
                         notification.notify(
@@ -132,11 +131,16 @@ class AppWindow(ctk.CTk):
                         )
                     except Exception:
                         pass
-                else:
+                elif not self._alert_open:
+                    self._alert_open = True
+
                     def _on_close(completed=False, t=task):
+                        self._alert_open = False
                         if completed:
                             self._complete_task(t)
+
                     show_alert(self, task, message, level, on_close=_on_close)
+                    break  # 한 번에 팝업 하나만
         except Exception:
             pass
         self.after(2000, self._poll_alerts)

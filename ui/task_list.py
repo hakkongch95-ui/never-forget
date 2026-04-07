@@ -17,13 +17,16 @@ def _card_bg(task: Task) -> str:
 
 
 class TaskListFrame(ctk.CTkScrollableFrame):
-    def __init__(self, master, on_complete=None, on_delete=None, on_edit=None, **kwargs):
+    def __init__(self, master, on_complete=None, on_delete=None, on_edit=None,
+                 empty_text="할 일 없음. 여유롭네.", **kwargs):
         super().__init__(master, **kwargs)
         self.on_complete = on_complete
         self.on_delete = on_delete
         self.on_edit = on_edit
+        self.empty_text = empty_text
         self._cards: list = []
         self._countdown_labels: list[tuple[ctk.CTkLabel, Task]] = []
+        self._overdue_count = 0  # tick()이 참조하는 캐시
 
     def refresh(self, tasks: list[Task]):
         for card in self._cards:
@@ -31,9 +34,11 @@ class TaskListFrame(ctk.CTkScrollableFrame):
         self._cards.clear()
         self._countdown_labels.clear()
 
+        self._overdue_count = sum(1 for t in tasks if seconds_left(t) <= 0 and t.status == "active")
+
         if not tasks:
             label = ctk.CTkLabel(
-                self, text="할 일 없음. 여유롭네.",
+                self, text=self.empty_text,
                 font=("Pretendard", 14), text_color="#666666"
             )
             label.pack(pady=40)
@@ -45,17 +50,22 @@ class TaskListFrame(ctk.CTkScrollableFrame):
 
     def tick(self):
         """매초 카운트다운 라벨 + 카드 배경색 갱신 (카드 재생성 없음)."""
+        overdue = 0
         for label, task in self._countdown_labels:
             try:
+                secs = seconds_left(task)
+                if secs <= 0:
+                    overdue += 1
                 label.configure(
                     text=format_countdown(task),
                     text_color=urgency_color(task),
                 )
-                # 카드 배경색도 갱신
                 card = label.master.master  # label → left frame → card
                 card.configure(fg_color=_card_bg(task))
             except Exception:
                 pass
+        self._overdue_count = overdue
+        return overdue
 
     def _add_card(self, task: Task):
         color = urgency_color(task)
