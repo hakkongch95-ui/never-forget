@@ -70,20 +70,25 @@ class AppWindow(ctk.CTk):
         self.active_list.refresh(active)
         self.done_list.refresh(done)
 
-        # 탭에 개수 표시
-        self.tab.set("진행 중")
-        for name, count in [("진행 중", len(active)), ("완료", len(done))]:
-            label = f"{name} ({count})" if count else name
-            # CTkTabview는 탭 이름 변경을 지원하지 않으므로 탭 버튼 텍스트를 직접 조작
-            try:
-                self.tab._segmented_button.configure(
-                    values=[
-                        f"진행 중 ({len(active)})" if len(active) else "진행 중",
-                        f"완료 ({len(done)})" if len(done) else "완료",
-                    ]
-                )
-            except Exception:
-                pass
+        # 탭에 개수 표시 (현재 탭 위치 유지)
+        try:
+            self.tab._segmented_button.configure(
+                values=[
+                    f"진행 중 ({len(active)})" if active else "진행 중",
+                    f"완료 ({len(done)})" if done else "완료",
+                ]
+            )
+        except Exception:
+            pass
+
+        # 긴급 태스크 수를 윈도우 타이틀에 표시
+        overdue = sum(1 for t in active if __import__('features.countdown', fromlist=['seconds_left']).seconds_left(t) <= 0)
+        if overdue:
+            self.title(f"⚠ NEVER FORGET — 마감 초과 {overdue}개!")
+        elif active:
+            self.title(f"NEVER FORGET ({len(active)}개 진행 중)")
+        else:
+            self.title("NEVER FORGET")
 
     def _tick(self):
         """매초 카운트다운 라벨만 갱신 (DB 쿼리 없음)."""

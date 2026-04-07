@@ -43,13 +43,16 @@ class TaskListFrame(ctk.CTkScrollableFrame):
             self._add_card(task)
 
     def tick(self):
-        """매초 카운트다운 라벨만 갱신 (카드 재생성 없음)."""
+        """매초 카운트다운 라벨 + 카드 배경색 갱신 (카드 재생성 없음)."""
         for label, task in self._countdown_labels:
             try:
                 label.configure(
                     text=format_countdown(task),
                     text_color=urgency_color(task),
                 )
+                # 카드 배경색도 갱신
+                card = label.master.master  # label → left frame → card
+                card.configure(fg_color=_card_bg(task))
             except Exception:
                 pass
 
@@ -85,6 +88,12 @@ class TaskListFrame(ctk.CTkScrollableFrame):
             ctk.CTkLabel(
                 left, text=task.description,
                 font=("Pretendard", 12), text_color="#888888", anchor="w"
+            ).pack(anchor="w")
+
+        if task.status == "completed" and task.completed_at:
+            ctk.CTkLabel(
+                left, text=f"완료: {task.completed_at.strftime('%m/%d %H:%M')}",
+                font=("Pretendard", 11), text_color="#555577", anchor="w"
             ).pack(anchor="w")
 
         # 우측: 버튼

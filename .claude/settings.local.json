@@ -3,7 +3,16 @@
     "allow": [
       "Bash(git --version)",
       "Bash(gh --version)",
-      "Bash(pip install:*)"
+      "Bash(pip install:*)",
+      "Bash(gh auth:*)",
+      "Bash(export PATH=\"$PATH:/c/Program Files/GitHub CLI\")",
+      "Bash(gh repo:*)",
+      "Bash(python main.py)",
+      "Bash(rm:*)",
+      "Bash(taskkill /F /IM python.exe)",
+      "Bash(rm -f \"C:/Users/user/Desktop/never forget/data/never_forget.db\")",
+      "Bash(taskkill:*)",
+      "Bash(tasklist:*)"
     ]
   }
 }
