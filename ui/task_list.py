@@ -17,10 +17,12 @@ class TaskListFrame(ctk.CTkScrollableFrame):
         self._cards.clear()
 
         if not tasks:
-            ctk.CTkLabel(
+            label = ctk.CTkLabel(
                 self, text="할 일 없음. 여유롭네.",
                 font=("Pretendard", 14), text_color="#666666"
-            ).pack(pady=40)
+            )
+            label.pack(pady=40)
+            self._cards.append(label)
             return
 
         for task in tasks:
