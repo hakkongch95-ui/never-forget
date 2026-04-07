@@ -1,3 +1,4 @@
+import winsound
 import customtkinter as ctk
 import core.database as db
 import core.scheduler as scheduler
@@ -83,13 +84,17 @@ class AppWindow(ctk.CTk):
         except Exception:
             pass
 
-        overdue = sum(1 for t in active if seconds_left(t) <= 0)
-        if overdue:
-            self.title(f"⚠ NEVER FORGET — 마감 초과 {overdue}개!")
+        overdue_count = sum(1 for t in active if seconds_left(t) <= 0)
+        if overdue_count:
+            self.title(f"⚠ NEVER FORGET — 마감 초과 {overdue_count}개!")
         elif active:
             self.title(f"NEVER FORGET ({len(active)}개 진행 중)")
         else:
             self.title("NEVER FORGET")
+
+        # 할 일이 하나도 없을 때 환영 힌트 표시
+        if not active and not done:
+            self._show_welcome()
 
     def _tick(self):
         overdue = self.active_list.tick()
@@ -100,8 +105,32 @@ class AppWindow(ctk.CTk):
     def _open_form(self):
         show_task_form(self, on_save=self._full_refresh)
 
+    def _show_welcome(self):
+        """최초 실행 시 툴팁 형태의 힌트 (한 번만)."""
+        if getattr(self, "_welcome_shown", False):
+            return
+        self._welcome_shown = True
+        top = ctk.CTkToplevel(self)
+        top.title("NEVER FORGET")
+        top.geometry("380x180")
+        top.resizable(False, False)
+        top.attributes("-topmost", True)
+        ctk.CTkLabel(
+            top,
+            text="잊으면 안 되는 일을 추가해.\n\nCtrl+N 또는 '+ 할 일 추가' 버튼으로 시작해.",
+            font=("Pretendard", 14),
+            justify="center",
+        ).pack(expand=True)
+        ctk.CTkButton(top, text="알겠어", width=120,
+                      command=top.destroy).pack(pady=(0, 20))
+
     def _complete_task(self, task):
         db.mark_completed(task.id)
+        # 완수 효과음
+        try:
+            winsound.MessageBeep(winsound.MB_OK)
+        except Exception:
+            pass
         self._full_refresh()
 
     def _edit_task(self, task):

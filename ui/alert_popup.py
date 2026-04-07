@@ -42,14 +42,24 @@ def show_alert(parent, task: Task, message: str, level: int, on_close=None):
         wraplength=600,
     ).pack(pady=(20, 10))
 
-    # 할 일 제목
+    # 할 일 제목 + 위협 레벨
+    title_row = ctk.CTkFrame(frame, fg_color="transparent")
+    title_row.pack(pady=5)
     ctk.CTkLabel(
-        frame,
+        title_row,
         text=f'"{task.title}"',
         font=("Pretendard", 18),
         text_color="#FFFFFF",
-        wraplength=600,
-    ).pack(pady=5)
+        wraplength=500,
+    ).pack(side="left")
+    if task.threat_level > 0:
+        threat_colors = ["#666666", "#AA6600", "#CC3300", "#FF0000", "#FF0000"]
+        ctk.CTkLabel(
+            title_row,
+            text=f"  위협 Lv.{task.threat_level}",
+            font=("Pretendard", 13, "bold"),
+            text_color=threat_colors[min(task.threat_level, 4)],
+        ).pack(side="left", padx=(8, 0))
 
     # 남은 시간 (실시간 갱신)
     countdown_label = ctk.CTkLabel(
